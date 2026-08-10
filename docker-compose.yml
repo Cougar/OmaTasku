@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  omatasku:
+    build: .
+    container_name: omatasku
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    read_only: true
+    tmpfs:
+      - /tmp
+    volumes:
+      - omatasku_data:/data
+    environment:
+      # Native Uvicorn socket binding configurations (essential for native container executions)
+      - UVICORN_PORT=8080
+      - UVICORN_HOST=0.0.0.0
+
+      # External public URL of the proxy service (configured for local-only localhost by default)
+      - BASE_URL=http://localhost:8080/
+      
+      # Database storage settings inside the container
+      - DB_DIR=/data
+      - DB_NAME=omatasku.db
+      
+      # Optional: Caches the original RSS feeds for 60 seconds (default: 60)
+      - RSS_CACHE_TTL=60
+      
+      # Optional: OpenTelemetry OTLP Distributed Tracing (uncomment and set to enable OTLP tracing)
+      # - OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
+      # - OTEL_SERVICE_NAME=omatasku
+      
+      # Dynamic startup DB mapping:
+      # If provided, OmaTasku automatically maps and synchronizes this User ID to the cookie in the DB on startup
+      - DEFAULT_USER_ID=00000000-0000-0000-0000-000000000000
+      - PIANO_TAC_COOKIE=your_premium_piano_tac_cookie_here
+
+volumes:
+  omatasku_data:
+    name: omatasku_data
