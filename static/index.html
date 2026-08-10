@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html lang="et">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OmaTasku RSS Mirror Control Portal</title>
+    <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+    <style>
+        :root {
+            --primary: #0066cc;
+            --primary-hover: #0052a3;
+            --bg-dark: #0f172a;
+            --card-dark: #1e293b;
+            --border-dark: #334155;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --success: #10b981;
+            --error: #ef4444;
+            --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            font-family: var(--font-family);
+            line-height: 1.5;
+            padding: 2rem 1rem;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 720px;
+            width: 100%;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        header h1 {
+            font-size: 2.25rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #60a5fa, #3b82f6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 0.5rem;
+        }
+
+        header p {
+            color: var(--text-muted);
+            font-size: 1rem;
+        }
+
+        /* Search Bar */
+        .search-card {
+            background-color: var(--card-dark);
+            border: 1px solid var(--border-dark);
+            border-radius: 12px;
+            padding: 1.25rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+
+        .search-group {
+            display: flex;
+            gap: 0.75rem;
+        }
+
+        .search-input {
+            flex: 1;
+            background-color: #0b0f19;
+            border: 1px solid var(--border-dark);
+            border-radius: 8px;
+            padding: 0.75rem 1rem;
+            color: var(--text-main);
+            font-family: monospace;
+            font-size: 0.9rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .search-input:focus {
+            border-color: var(--primary);
+        }
+
+        /* Main Form Card */
+        .main-card {
+            background-color: var(--card-dark);
+            border: 1px solid var(--border-dark);
+            border-radius: 12px;
+            padding: 2rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            position: relative;
+        }
+
+        .badge {
+            position: absolute;
+            top: 1.25rem;
+            right: 1.25rem;
+            font-size: 0.75rem;
+            font-weight: bold;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            text-transform: uppercase;
+        }
+
+        .badge.new {
+            background-color: rgba(59, 130, 246, 0.15);
+            color: #60a5fa;
+            border: 1px solid rgba(59, 130, 246, 0.3);
+        }
+
+        .badge.edit {
+            background-color: rgba(245, 158, 11, 0.15);
+            color: #fbbf24;
+            border: 1px solid rgba(245, 158, 11, 0.3);
+        }
+
+        .form-title {
+            font-size: 1.25rem;
+            font-weight: 700;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .form-group {
+            margin-bottom: 1.25rem;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            margin-bottom: 0.5rem;
+        }
+
+        .form-control {
+            width: 100%;
+            background-color: #0b0f19;
+            border: 1px solid var(--border-dark);
+            border-radius: 8px;
+            padding: 0.75rem 1rem;
+            color: var(--text-main);
+            font-size: 0.95rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .form-control:focus {
+            border-color: var(--primary);
+        }
+
+        .form-control[readonly] {
+            color: var(--text-muted);
+            cursor: not-allowed;
+            background-color: rgba(15, 23, 42, 0.5);
+        }
+
+        .form-control.code {
+            font-family: monospace;
+            font-size: 0.9rem;
+        }
+
+        .meta-info {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            background-color: rgba(15, 23, 42, 0.3);
+            border-radius: 8px;
+            padding: 0.75rem;
+            margin-bottom: 1.25rem;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            border: 1px dashed var(--border-dark);
+        }
+
+        /* Buttons */
+        .btn {
+            display: inline-flex;
+            justify-content: center;
+            align-items: center;
+            padding: 0.75rem 1.5rem;
+            font-size: 0.95rem;
+            font-weight: 600;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            transition: background-color 0.2s, transform 0.1s;
+            text-decoration: none;
+        }
+
+        .btn:active {
+            transform: scale(0.98);
+        }
+
+        .btn-primary {
+            background-color: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background-color: var(--primary-hover);
+        }
+
+        .btn-secondary {
+            background-color: rgba(51, 65, 85, 0.5);
+            color: var(--text-main);
+            border: 1px solid var(--border-dark);
+        }
+
+        .btn-secondary:hover {
+            background-color: rgba(51, 65, 85, 0.8);
+        }
+
+        .button-group {
+            display: flex;
+            gap: 0.75rem;
+            margin-top: 1.5rem;
+        }
+
+        /* Feedback Notifications */
+        .toast {
+            padding: 1rem;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            margin-bottom: 1.5rem;
+            display: none;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .toast.success {
+            background-color: rgba(16, 185, 129, 0.15);
+            color: var(--success);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            display: block;
+        }
+
+        .toast.error {
+            background-color: rgba(239, 68, 68, 0.15);
+            color: var(--error);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            display: block;
+        }
+
+        /* Feeds Panel */
+        .feeds-card {
+            background-color: var(--card-dark);
+            border: 1px solid var(--border-dark);
+            border-radius: 12px;
+            padding: 2rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+
+        .feeds-card h3 {
+            font-size: 1.25rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            border-bottom: 1px solid var(--border-dark);
+            padding-bottom: 0.5rem;
+        }
+
+        .feed-item {
+            background-color: #0b0f19;
+            border: 1px solid var(--border-dark);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .feed-title {
+            font-weight: 700;
+            font-size: 0.95rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .feed-description {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-bottom: 0.75rem;
+        }
+
+        .feed-link-group {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .feed-url {
+            flex: 1;
+            background-color: #1a2333;
+            border: 1px solid var(--border-dark);
+            border-radius: 6px;
+            padding: 0.5rem;
+            font-family: monospace;
+            font-size: 0.8rem;
+            color: #60a5fa;
+            overflow-x: auto;
+            white-space: nowrap;
+        }
+
+        .btn-copy {
+            padding: 0.25rem 0.75rem;
+            font-size: 0.75rem;
+            background-color: var(--primary);
+            color: white;
+            border-radius: 6px;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .btn-copy:hover {
+            background-color: var(--primary-hover);
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* GitHub Diagonal Corner Ribbon styling */
+        .github-corner:hover .octo-arm {
+            animation: octocat-wave 560ms ease-in-out;
+        }
+        @keyframes octocat-wave {
+            0%, 100% { transform: rotate(0); }
+            20%, 60% { transform: rotate(-25deg); }
+            40%, 80% { transform: rotate(10deg); }
+        }
+        @media (max-width: 500px) {
+            .github-corner:hover .octo-arm {
+                animation: none;
+            }
+            .github-corner .octo-arm {
+                animation: octocat-wave 560ms ease-in-out;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<!-- GitHub Corner Ribbon -->
+<a href="https://github.com/Cougar/OmaTasku" target="_blank" class="github-corner" aria-label="Vaata koodi GitHubis">
+    <svg width="80" height="80" viewBox="0 0 250 250" style="fill: #2563eb; color: #fff; position: absolute; top: 0; border: 0; right: 0; z-index: 10000;" aria-hidden="true">
+        <path d="M0,0 L115,115 L130,115 L142,142 L250,250 L250,0 Z"></path>
+        <path d="M128.3,109.0 C113.8,99.7 119.0,89.6 119.0,89.6 C122.0,82.7 120.5,78.6 120.5,78.6 C119.2,72.0 123.4,76.3 123.4,76.3 C127.3,80.9 125.5,87.3 125.5,87.3 C122.9,97.6 130.6,101.9 134.4,103.2" fill="currentColor" style="transform-origin: 130px 106px;" class="octo-arm"></path>
+        <path d="M115.0,115.0 C114.9,115.1 118.7,116.5 119.8,115.4 L133.7,101.6 C136.9,99.2 139.9,98.4 142.2,98.6 C133.8,88.0 127.5,74.4 143.8,58.0 C148.5,53.4 154.0,51.2 159.7,51.0 C160.3,49.4 163.2,43.6 171.4,40.1 C171.4,40.1 176.1,42.5 178.8,56.2 C183.1,58.6 187.2,61.8 190.9,65.4 C194.5,69.0 197.7,73.2 200.1,77.6 C213.8,80.2 216.3,84.9 216.3,84.9 C212.7,93.1 206.9,96.0 205.4,96.6 C205.1,102.4 203.0,107.9 198.3,112.5 C181.9,128.9 168.3,122.5 157.7,114.1 C157.9,116.9 156.7,120.9 152.7,124.9 L141.0,136.5 C139.8,137.7 141.6,141.9 141.8,141.8 Z" fill="currentColor" class="octo-body"></path>
+    </svg>
+</a>
+
+<div class="container">
+    <header>
+        <h1>OmaTasku</h1>
+        <p>RSS-voogude premium-peegeldusportaal</p>
+    </header>
+
+    <!-- Supported Portals Section -->
+    <div class="main-card">
+        <h2 class="form-title" style="color: #60a5fa; border-bottom: 1px solid var(--border-dark); padding-bottom: 0.5rem; margin-bottom: 1rem;">
+            Toetatud portaalid
+        </h2>
+        <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1.25rem;">
+            OmaTasku toetab hetkel järgmiste premium-platvormide peegeldamist:
+        </p>
+        
+        <div style="display: grid; grid-template-columns: 1fr; gap: 1rem;">
+            <!-- Portal Card: Postimees (Kuku Raadio) -->
+            <div style="background-color: #0b0f19; border: 1px solid var(--border-dark); border-radius: 8px; padding: 1rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+                <div>
+                    <b style="color: var(--text-main); display: block; font-size: 0.95rem;">Postimees (Kuku Raadio)</b>
+                    <span style="color: var(--text-muted); font-size: 0.8rem;">Ametlik raadio- ja taskuhäälingute portaal.</span>
+                </div>
+                <a href="https://kuula.postimees.ee/" target="_blank" class="btn btn-secondary" style="padding: 0.4rem 1rem; font-size: 0.8rem; text-decoration: none; border-color: var(--border-dark);">
+                    Külasta lehte ➔
+                </a>
+            </div>
+            
+            <!-- Future Portals Placeholder (Extensible by copy-pasting this layout!) -->
+        </div>
+    </div>
+
+    <!-- Search/Load Card -->
+    <div class="search-card">
+        <div class="search-group">
+            <input type="text" id="search-uuid" class="search-input" placeholder="Sisesta olemasolev kasutaja ID (UUIDv4) laadimiseks...">
+            <button class="btn btn-secondary" onclick="searchUser()">Laadi</button>
+        </div>
+    </div>
+
+    <!-- Notification Feed -->
+    <div id="toast-notif" class="toast"></div>
+
+    <!-- Main Registration/Update Card -->
+    <div class="main-card">
+        <span id="card-badge" class="badge new">Uus Kasutaja</span>
+        <h2 id="form-heading" class="form-title">Loo uus Premium peegeldus</h2>
+
+        <form id="session-form" onsubmit="submitForm(event)">
+            <div class="form-group">
+                <label for="user-uuid">Sinu kordumatu kasutaja ID (UUID)</label>
+                <input type="text" id="user-uuid" class="form-control code" placeholder="Sisesta või kopeeri UUIDv4..." required>
+                <p style="color: var(--text-muted); font-size: 0.75rem; margin-top: 0.35rem;">
+                    * See väli on täidetud automaatselt, kuid võid siia kleepida oma <b>vana/olemasoleva UUIDv4</b> (nt. andmebaasi taastamisel), et vältida podcastide linkide muutmist.
+                </p>
+            </div>
+
+            <div class="form-group">
+                <label for="user-comment">Kasutajanimi / Märkus (Valikuline)</label>
+                <input type="text" id="user-comment" class="form-control" placeholder="nt. Minu Telefon, Sõber Tanel...">
+            </div>
+
+            <div class="form-group">
+                <label for="user-cookie">Kopeeritud <b>__tac</b> küpsis (Piano ID)</label>
+                <input type="text" id="user-cookie" class="form-control code" placeholder="Kopeeri siia __tac küpsise sisu..." required>
+            </div>
+
+            <!-- Timestamps Info (Only shown for loaded edit sessions) -->
+            <div id="meta-container" class="meta-info" style="display: none;">
+                <div>Esmane registreerimine:<br><span id="meta-created" style="font-weight: bold;">-</span></div>
+                <div>Viimane küpsise uuendus:<br><span id="meta-updated" style="font-weight: bold;">-</span></div>
+            </div>
+
+            <div class="button-group">
+                <button type="submit" id="btn-submit" class="btn btn-primary">Salvesta seanss</button>
+                <button type="button" id="btn-reset" class="btn btn-secondary" onclick="resetForm()">Loo uus UUID</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- OmaTasku Partner Userscript Card -->
+    <div class="main-card" style="border-color: #4f46e5; background: linear-gradient(180deg, #1e293b, #0f172a 70%);">
+        <span class="badge" style="background-color: rgba(79, 70, 229, 0.2); color: #818cf8; border: 1px solid rgba(79, 70, 229, 0.4); top: 1.25rem; right: 1.25rem;">Soovituslik</span>
+        <h2 class="form-title" style="color: #818cf8;">⚡ OmaTasku Partner (Kasutajaskript)</h2>
+        <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1.25rem; line-height: 1.6;">
+            Ära otsi ega kopeeri küpsiseid käsitsi! Paigalda oma veebibrauserisse (Chrome, Firefox, Edge, Safari) <b>ViolentMonkey</b> või <b>TamperMonkey</b> laiendus ja installi meie ametlik abiskript.
+        </p>
+        
+        <div style="background-color: #0b0f19; border: 1px solid var(--border-dark); border-radius: 8px; padding: 1rem; margin-bottom: 1.5rem; font-size: 0.85rem; color: var(--text-muted); line-height: 1.6;">
+            <b style="color: var(--text-main); display: block; margin-bottom: 0.5rem;">Kuidas see töötab?</b>
+            1. Pärast skripti paigaldamist ilmub raadioportaali lehtedele alla paremasse nurka sinine nupp <b>"⚡ OmaTasku Sünk"</b>.<br>
+            2. Kui sinu seanss aegub, klõpsa lihtsalt seda nuppu. Skript võtab brauserist värske küpsise ja uuendab sinu OmaTasku seanssi taustal <b>ühe sekundiga</b>!<br>
+            3. <b>UUS:</b> Iga saate pealkirja kõrvale ilmub roheline nupp <b>"📻 OmaTasku RSS"</b>. Sellele klõpsates kopeeritakse selle saate isiklik premium-mängija link automaatselt sinu lõikelauale!
+        </div>
+
+        <a href="/static/omatasku.user.js" class="btn" style="background-color: #4f46e5; color: white; display: inline-flex; align-items: center; gap: 0.5rem; text-decoration: none;">
+            📥 Paigalda OmaTasku Partner Skript
+        </a>
+    </div>
+
+    <!-- Feeds Copy Panel (Only shown when a valid UUID is set and saved) -->
+    <div id="feeds-panel" class="feeds-card" style="display: none;">
+        <h3>Sinu Premium RSS Vood</h3>
+        <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 1.5rem;">
+            Kopeeri allolevad vood ja lisa need oma lemmik podcasti rakendusse (nt. AntennaPod, Pocket Casts, Overcast, Apple Podcasts).
+        </p>
+
+        <!-- Feed Item: Digitund -->
+        <div class="feed-item">
+            <div class="feed-title">Digitund</div>
+            <div class="feed-description">Raadio Kuku tehnoloogiasaade. Saate põhifookuseks on tarbijaelektroonika, internet ja mobiilimaailm.</div>
+            <div class="feed-link-group">
+                <div class="feed-url" id="url-digitund">...</div>
+                <button class="btn-copy" onclick="copyFeedUrl('url-digitund')">Kopeeri</button>
+            </div>
+        </div>
+
+        <!-- Feed Item: Keskpäevatund -->
+        <div class="feed-item">
+            <div class="feed-title">Keskpäevatund</div>
+            <div class="feed-description">Kuku Raadio legendaarne arutelusaade nädala tähtsamatest sündmustest poliitikas ja majanduses.</div>
+            <div class="feed-link-group">
+                <div class="feed-url" id="url-keskpaevatund">...</div>
+                <button class="btn-copy" onclick="copyFeedUrl('url-keskpaevatund')">Kopeeri</button>
+            </div>
+        </div>
+
+        <!-- Feed Item: Välismääraja -->
+        <div class="feed-item">
+            <div class="feed-title">Välismääraja</div>
+            <div class="feed-description">Kuku Raadio välispoliitika- ja rahvusvaheliste suhete analüüsisaade.</div>
+            <div class="feed-link-group">
+                <div class="feed-url" id="url-valismaaraja">...</div>
+                <button class="btn-copy" onclick="copyFeedUrl('url-valismaaraja')">Kopeeri</button>
+            </div>
+        </div>
+
+        <!-- How-to Guide -->
+        <div class="instructions-panel" style="margin-top: 2rem; border-top: 1px solid var(--border-dark); padding-top: 1.5rem;">
+            <h4 style="font-size: 1rem; font-weight: 700; margin-bottom: 0.75rem; color: #60a5fa;">Kuidas lisada oma lemmiksaadet?</h4>
+            <ol style="font-size: 0.85rem; color: var(--text-muted); padding-left: 1.2rem; line-height: 1.6;">
+                <li style="margin-bottom: 0.5rem;">Leia raadioportaalist oma lemmiksaate leht (nt. <code>https://kuula.postimees.ee/kuku/digitund</code>). Saate nimi lehe aadressi lõpus (<code>digitund</code>) on selle saate <b>tunnus (slug)</b>.</li>
+                <li style="margin-bottom: 0.5rem;">Sinu isikliku peegelduse URL on kujul:<br>
+                    <div style="background-color: #0b0f19; border: 1px solid var(--border-dark); border-radius: 6px; padding: 0.5rem; font-family: monospace; color: var(--text-main); margin-top: 0.25rem; font-size: 0.8rem; word-break: break-all;">
+                        <span id="template-server-url">http://your-server</span>/<span id="template-user-id" style="color: #fbbf24;">sinu-user-id</span>/postimees/rss/shows/<span style="color: #60a5fa;">saate-tunnus</span>
+                    </div>
+                </li>
+                <li>Asenda <code>saate-tunnus</code> leitud saate nimega ja kopeeri valminud aadress otse oma podcasti mängijasse!</li>
+            </ol>
+        </div>
+    </div>
+</div>
+
+<script>
+    let isEditMode = false;
+    let serverBaseUrl = window.location.origin;
+
+    // Dynamically parses and extracts user-friendly error messages from API responses
+    function extractErrorMessage(data) {
+        if (!data) return "Toiming ebaõnnestus serveri vea tõttu.";
+        
+        const detail = data.detail;
+        if (!detail) return "Toiming ebaõnnestus serveri vea tõttu.";
+        
+        // If it is a simple string error, return as is
+        if (typeof detail === 'string') {
+            return detail;
+        }
+        
+        // If it is an array (Pydantic validation error lists)
+        if (Array.isArray(detail)) {
+            return detail.map(err => {
+                const field = err.loc ? err.loc[err.loc.length - 1] : '';
+                const msg = err.msg || 'Vigane väärtus';
+                // Translate standard pydantic fields to Estonians
+                let fieldLabel = field;
+                if (field === 'tac_cookie') fieldLabel = '__tac küpsis';
+                if (field === 'uuid') fieldLabel = 'Kasutaja ID';
+                if (field === 'comment') fieldLabel = 'Kasutajanimi/Märkus';
+                
+                return fieldLabel ? `Väli <b>"${fieldLabel}"</b>: ${msg}` : msg;
+            }).join('<br>');
+        }
+        
+        if (typeof detail === 'object') {
+            return JSON.stringify(detail);
+        }
+        
+        return String(detail);
+    }
+
+    // Fetch initial configuration on load
+    async function loadConfig() {
+        try {
+            const res = await fetch('/api/config');
+            if (res.ok) {
+                const config = await res.json();
+                serverBaseUrl = config.base_url;
+            }
+        } catch (e) {
+            console.error("Config fetching failed, using origin:", e);
+        }
+        await resetForm();
+    }
+
+    // Displays an overlay notification toast
+    function showToast(message, type = 'success') {
+        const toast = document.getElementById('toast-notif');
+        toast.innerHTML = message;
+        toast.className = `toast ${type}`;
+        toast.style.display = 'block'; // Reset inline style to force visibility on subsequent triggers
+    }
+
+    // Fetches a fresh, server-side generated secure UUID
+    async function generateNewUUID() {
+        try {
+            const res = await fetch('/api/uuid');
+            if (res.ok) {
+                const data = await res.json();
+                document.getElementById('user-uuid').value = data.uuid;
+            }
+        } catch (e) {
+            // Client-side fallback if server api fails
+            document.getElementById('user-uuid').value = crypto.randomUUID();
+        }
+    }
+
+    // Reset back to "Create New" state
+    async function resetForm() {
+        isEditMode = false;
+        
+        // Reset UI labels
+        document.getElementById('card-badge').className = "badge new";
+        document.getElementById('card-badge').textContent = "Uus Kasutaja";
+        document.getElementById('form-heading').textContent = "Loo uus Premium peegeldus";
+        document.getElementById('btn-submit').textContent = "Salvesta seanss";
+        
+        // Reset inputs
+        await generateNewUUID();
+        document.getElementById('user-uuid').readOnly = false;
+        document.getElementById('user-comment').value = '';
+        document.getElementById('user-cookie').value = '';
+        document.getElementById('search-uuid').value = '';
+        
+        // Hide metadata, feeds, and active notifications
+        document.getElementById('toast-notif').style.display = 'none';
+        document.getElementById('meta-container').style.display = 'none';
+        document.getElementById('feeds-panel').style.display = 'none';
+    }
+
+    // Submits either a POST or PUT request depending on edit state
+    async function submitForm(event) {
+        event.preventDefault();
+        const uuidVal = document.getElementById('user-uuid').value;
+        const commentVal = document.getElementById('user-comment').value;
+        const cookieVal = document.getElementById('user-cookie').value;
+
+        const url = isEditMode ? `/api/users/${uuidVal}` : '/api/users';
+        const method = isEditMode ? 'PUT' : 'POST';
+        const bodyData = isEditMode ? { tac_cookie: cookieVal, comment: commentVal } : { uuid: uuidVal, tac_cookie: cookieVal, comment: commentVal };
+
+        try {
+            const res = await fetch(url, {
+                method: method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(bodyData)
+            });
+
+            const data = await res.json();
+
+            if (res.ok) {
+                showToast(isEditMode ? "Kasutaja seanss uuendatud edukalt!" : "Uus kasutaja registreeritud edukalt!", "success");
+                
+                // Set UUID field to readonly after successful save
+                document.getElementById('user-uuid').readOnly = true;
+                
+                // Show podcast feeds
+                updateFeedsPanel(uuidVal);
+
+                // If new creation, switch to edit mode immediately
+                if (!isEditMode) {
+                    isEditMode = true;
+                    document.getElementById('card-badge').className = "badge edit";
+                    document.getElementById('card-badge').textContent = "Seansi Muutmine";
+                    document.getElementById('form-heading').textContent = "Peegelduse seadete muutmine";
+                    document.getElementById('btn-submit').textContent = "Uuenda seanssi";
+                }
+                
+                // Set metadata values
+                document.getElementById('meta-created').textContent = formatDate(data.created_at);
+                document.getElementById('meta-updated').textContent = formatDate(data.updated_at);
+                document.getElementById('meta-container').style.display = 'grid';
+                
+            } else {
+                showToast(extractErrorMessage(data), "error");
+            }
+        } catch (e) {
+            showToast("Ühenduse viga serveriga. Kontrolli, kas server töötab.", "error");
+        }
+    }
+
+    // Searches for an existing user UUID
+    async function searchUser() {
+        const uuidVal = document.getElementById('search-uuid').value.trim();
+        if (!uuidVal) {
+            showToast("Sisesta otsinguks olemasolev kasutaja ID (UUID)!", "error");
+            return;
+        }
+
+        try {
+            const res = await fetch(`/api/users/${uuidVal}`);
+            const data = await res.json();
+
+            if (res.ok) {
+                showToast("Kasutaja andmed laetud!", "success");
+                isEditMode = true;
+
+                // Populate form
+                document.getElementById('user-uuid').value = data.uuid;
+                document.getElementById('user-uuid').readOnly = true;
+                document.getElementById('user-comment').value = data.comment || '';
+                document.getElementById('user-cookie').value = data.tac_cookie;
+
+                // Adjust UI
+                document.getElementById('card-badge').className = "badge edit";
+                document.getElementById('card-badge').textContent = "Seansi Muutmine";
+                document.getElementById('form-heading').textContent = "Peegelduse seadete muutmine";
+                document.getElementById('btn-submit').textContent = "Uuenda seanssi";
+
+                // Metadata
+                document.getElementById('meta-created').textContent = formatDate(data.created_at);
+                document.getElementById('meta-updated').textContent = formatDate(data.updated_at);
+                document.getElementById('meta-container').style.display = 'grid';
+
+                // Display custom feeds URLs
+                updateFeedsPanel(data.uuid);
+
+            } else {
+                showToast(extractErrorMessage(data), "error");
+            }
+        } catch (e) {
+            showToast("Viga otsingul. Serveriga ei saanud ühendust.", "error");
+        }
+    }
+
+    // Helper to render customized RSS URLs
+    function updateFeedsPanel(uuid) {
+        document.getElementById('url-digitund').textContent = `${serverBaseUrl}/${uuid}/postimees/rss/shows/digitund`;
+        document.getElementById('url-keskpaevatund').textContent = `${serverBaseUrl}/${uuid}/postimees/rss/shows/keskpaevatund`;
+        document.getElementById('url-valismaaraja').textContent = `${serverBaseUrl}/${uuid}/postimees/rss/shows/valismaaraja`;
+        
+        // Populate dynamic spans inside the instruction guide
+        document.getElementById('template-user-id').textContent = uuid;
+        document.getElementById('template-server-url').textContent = serverBaseUrl;
+        
+        document.getElementById('feeds-panel').style.display = 'block';
+    }
+
+    // Copy Feed URL Helper
+    function copyFeedUrl(elementId) {
+        const urlText = document.getElementById(elementId).textContent;
+        navigator.clipboard.writeText(urlText).then(() => {
+            showToast("Feed'i link kopeeritud lõikelauale!", "success");
+        }).catch(err => {
+            showToast("Kopeerimine ebaõnnestus.", "error");
+        });
+    }
+
+    // Clean Date Formatter Helper
+    function formatDate(isoStr) {
+        if (!isoStr) return "-";
+        try {
+            const d = new Date(isoStr);
+            return d.toLocaleString('et-EE', { dateStyle: 'medium', timeStyle: 'short' });
+        } catch (e) {
+            return isoStr;
+        }
+    }
+
+    // Run on startup
+    window.onload = loadConfig;
+</script>
+
+</body>
+</html>
