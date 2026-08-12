@@ -89,6 +89,17 @@ def init_tracer():
         os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
         or os.getenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT")
     )
+    headers_raw = os.getenv("OTEL_EXPORTER_OTLP_HEADERS", "")
+
+    headers_dict = {}
+    if headers_raw:
+        # Splits "Authorization=Basic%20..." into key and value
+        for kv in headers_raw.split(","):
+            if "=" in kv:
+                key, val = kv.split("=", 1)
+                # OpenTelemetry's Python parser requires unquoting the %20 here if handled manually
+                import urllib.parse
+                headers_dict[key.strip()] = urllib.parse.unquote(val.strip())
 
     if not otlp_endpoint:
         # If no endpoint is configured, we fallback to a local tracer without exporting
@@ -104,7 +115,10 @@ def init_tracer():
     provider = TracerProvider(resource=resource)
 
     # Configure OTLP Exporter (defaults to http/protobuf which is standard and lightweight)
-    otlp_exporter = OTLPSpanExporter(endpoint=otlp_endpoint)
+    otlp_exporter = OTLPSpanExporter(
+            endpoint=otlp_endpoint,
+            headers=headers_dict
+    )
     span_processor = BatchSpanProcessor(otlp_exporter)
     provider.add_span_processor(span_processor)
 
