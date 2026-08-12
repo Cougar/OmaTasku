@@ -4,10 +4,13 @@ Handles user registrations, Piano ID __tac session cookie storage, and persisten
 premium MP3 file size caching in a local, performance-optimized SQLite database.
 """
 
-import sqlite3
 import os
 from datetime import datetime
+import sqlite3
 from typing import Optional
+
+# Load tracing module for database span instrumentations
+import tracing
 
 DB_DIR = os.getenv("DB_DIR", ".")
 DB_NAME = os.getenv("DB_NAME", "omatasku.db")
@@ -40,11 +43,55 @@ def update_db_path(new_path: str):
 ensure_db_dir_exists()
 
 
+class TracedConnection:
+    """A proxy wrapper around sqlite3.Connection that automatically traces all execute calls."""
+
+    def __init__(self, conn: sqlite3.Connection):
+        self._conn = conn
+
+    def __getattr__(self, name: str):
+        return getattr(self._conn, name)
+
+    def execute(self, sql: str, parameters: tuple = ()):
+        """Intercepts and traces SQLite query execution via OpenTelemetry."""
+        tracer = tracing.get_tracer()
+        operation = sql.strip().split()[0].upper() if sql else "QUERY"
+
+        with tracer.start_as_current_span(f"db.execute {operation}") as span:
+            span.set_attribute("db.system", "sqlite")
+            span.set_attribute("db.statement", sql)
+            span.set_attribute("db.operation", operation)
+            return self._conn.execute(sql, parameters)
+
+    def commit(self):
+        """Forwards commit transaction to the underlying connection."""
+        self._conn.commit()
+
+    def rollback(self):
+        """Forwards rollback transaction to the underlying connection."""
+        self._conn.rollback()
+
+    def close(self):
+        """Forwards close to the underlying connection."""
+        self._conn.close()
+
+    def cursor(self):
+        """Forwards cursor creation to the underlying connection."""
+        return self._conn.cursor()
+
+    def __enter__(self):
+        self._conn.__enter__()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self._conn.__exit__(exc_type, exc_val, exc_tb)
+
+
 def get_connection():
     """Returns a connection to the SQLite database."""
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
-    return conn
+    return TracedConnection(conn)
 
 
 def init_db():
