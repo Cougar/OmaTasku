@@ -1,3 +1,7 @@
+[![Pylint](https://github.com/Cougar/OmaTasku/actions/workflows/pylint.yml/badge.svg)](https://github.com/Cougar/OmaTasku/actions/workflows/pylint.yml)
+[![CodeQL Advanced](https://github.com/Cougar/OmaTasku/actions/workflows/codeql.yml/badge.svg)](https://github.com/Cougar/OmaTasku/actions/workflows/codeql.yml)
+[![Docker Image CI](https://github.com/Cougar/OmaTasku/actions/workflows/docker-image.yml/badge.svg)](https://github.com/Cougar/OmaTasku/actions/workflows/docker-image.yml)
+
 # OmaTasku (Own Podcast) 📻
 
 > ### 🚀 AVALIK TEENUS (GENERAL PUBLIC)
