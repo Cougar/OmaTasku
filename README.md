@@ -1,6 +1,7 @@
 [![Pylint](https://github.com/Cougar/OmaTasku/actions/workflows/pylint.yml/badge.svg)](https://github.com/Cougar/OmaTasku/actions/workflows/pylint.yml)
 [![CodeQL Advanced](https://github.com/Cougar/OmaTasku/actions/workflows/codeql.yml/badge.svg)](https://github.com/Cougar/OmaTasku/actions/workflows/codeql.yml)
 [![Docker Image CI](https://github.com/Cougar/OmaTasku/actions/workflows/docker-image.yml/badge.svg)](https://github.com/Cougar/OmaTasku/actions/workflows/docker-image.yml)
+[![OmaTasku Status](https://img.shields.io/uptimerobot/status/m803724870-d2d62fcecea83d09bca996f8?label=OmaTasku)](https://omatasku.v6n.xyz/)
 
 # OmaTasku (Own Podcast) 📻
 
