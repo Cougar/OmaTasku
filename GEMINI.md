@@ -44,7 +44,7 @@ Through research on the target premium audio platform, we have mapped out the fo
 #### E. Observability & Monitoring
 - Exposes a public-safe, high-performance **`/metrics`** endpoint designed for Prometheus scrapers.
 - Incorporates a non-blocking request tracking HTTP middleware.
-- **Card-Cardinality & Security:** Hides sensitive user UUIDs inside request paths dynamically using regex normalization, replacing them with a static `{user_id}` placeholder, preventing both data leaks and Prometheus label cardinality explosion.
+- **Card-Cardinality & Security:** Evaluates incoming path requests natively against FastAPI's internal router state. If matched, it uses the static parameterized route path (e.g. `"/{user_id}/postimees/rss/shows/{show_slug}"`), completely abstracting away individual user UUIDs. If un-matched (WordPress scanner probes, etc.), it groups them safely under a single label **`"*"`**, preventing Prometheus label cardinality explosion.
 
 ---
 
@@ -104,76 +104,43 @@ The project is built on **Python 3.9+** using **FastAPI** to provide a fast, asy
 
 2. **Multi-Layer Cache System:**
    - **Layer 1: Global original RSS XML cache (`rss_cache`)** - Caches the original platform feed XML globally for 60 seconds.
-   - **Layer 2: User-specific premium rewritten XML cache (`user_feed_cache`)** - Caches the final, premium-rewritten RSS XML per user-show slug for 60 seconds (completely bypassing DB queries, parsing, and signatures resolution on consecutive fetches).
-   - **Layer 3: Permanent file size cache (`file_size_cache`)** - Caches resolved premium MP3 file sizes permanently (since a published file's size never changes), executing zero future network calls for these items.
+   - **Layer 2: User-specific premium rewritten XML cache (`user_feed_cache`)** - Caches the final, premium-rewritten RSS XML per user-show slug for 60 seconds.
+   - **Layer 3: Permanent in-memory file size cache (`file_size_cache`)** - Caches resolved premium MP3 file sizes in-memory for ultra-fast, 0ms CPU-level lookup latency.
+   - **Layer 4: Permanent database file size cache (`file_sizes` table)** - Caches resolved premium MP3 file sizes permanently in SQLite under the parameter-stripped clean `.mp3` path key, guaranteeing 100% cache hits across server restarts.
 
 3. **Database Mapping Store (SQLite/JSON):**
-   - Keeps a secure mapping of `user_id` (a cryptographic UUID) to the user's `__tac` cookie.
+   - Keeps a secure mapping of `user_id` (a cryptographic UUID) to the user's `__tac` cookie in table `users`.
+   - Caches premium resolved file sizes in table `file_sizes` mapped by `public_url`.
    - **Lifespan Startup Sync:** Automatically creates and registers the `DEFAULT_USER_ID` with the active environment's `PIANO_TAC_COOKIE` on startup, and automatically synchronizes them if changed.
 
 4. **Web Update Portal (`/`):**
    - A simple, clean, mobile-friendly HTML webpage served by FastAPI.
-   - **Custom UUID Restore (Disaster Recovery):** Allows users to type or paste their own custom/existing UUIDv4 during registration. This offers a seamless way to restore their identical accounts in case of database flushes, avoiding the need to change feed URLs inside their podcast player apps.
-   - **State Machine UI:** Enables users to paste their cryptographic `user_id` and their updated `__tac` cookie, dynamically locking the UUID to read-only mode upon successful search retrieval or submission.
+   - **Custom UUID Restore:** Allows users to type or paste their own custom/existing UUIDv4 during registration. This offers a seamless way to restore their identical accounts in case of database flushes, avoiding the need to change feed URLs inside their podcast player apps.
    - Displays copyable Option A RSS links for popular shows and provides a user-friendly setup guide.
 
 5. **Observability Endpoint (`/metrics`):**
    - Serves Prometheus-compatible plain-text metrics.
    - **`omatasku_sessions_total`** (Gauge): Number of registered user sessions.
    - **`omatasku_last_registration_timestamp`** (Gauge): Epoch timestamp of the last session registration.
-   - **`omatasku_http_requests_total`** (Counter): Access counts grouped by `method`, normalized `path` (replacing UUIDs with `{user_id}`), and HTTP response `status`.
+   - **`omatasku_http_requests_total`** (Counter): Access counts grouped by `method`, normalized `path` (replacing variables with route templates natively), and HTTP response `status`.
+   - **`omatasku_outbound_head_requests_total`** (Counter): Outbound premium MP3 size HEAD request counts grouped by `show_slug` and returned HTTP status codes (or `status="error"` on exceptions).
+
+6. **Distributed Tracing (OpenTelemetry):**
+   - Fully instrumented with OpenTelemetry OTLP exporters.
+   - Provides clean tracing spans for inbound HTTP requests, original RSS fetches, and parallel file size HEAD calls.
+   - **Secure Cookie Masking:** Automatically censors the sensitive `__tac` cookie value from trace attributes (`omatasku.tac_cookie_preview`).
+   - **Database Query Tracing:** Includes a custom `TracedConnection` proxy class inside `database.py` that intercepts all SQLite `execute()` transactions, automatically emitting `db.execute [OPERATION]` traces populated with standard `db.system`, `db.statement`, and `db.operation` attributes.
+
+7. **Global Session Registration Rate Limiter:**
+   - Incorporates a constant-memory, O(1) global rolling-window rate-limiting counter.
+   - Restricts new session registrations (`POST /api/users`) to exactly 2 per minute, protecting the SQLite database from bulk-registration DoS attacks.
+   - Does **not** apply any rate limits to cookie updates (`PUT /api/users/{user_id}`) or RSS streaming queries.
 
 ---
 
 ## 3. Building and Running
 
-### Prerequisites
-- Python 3.9+
-- `pip` or virtualenv for dependency management.
-
-### Configuration (Strict 12-Factor App Environment)
-Configure the service purely using environment variables (especially when running inside Docker in read-only mode):
-```bash
-# Optional default User ID & tac cookie on startup
-DEFAULT_USER_ID="00000000-0000-0000-0000-000000000000"
-PIANO_TAC_COOKIE="your_tac_cookie_value_here"
-
-# Public External Base URL (used to generate RSS links in the UI)
-BASE_URL="http://omatasku.example.com/"
-
-# Cache TTL in seconds (default: 1 minute / 60 seconds)
-RSS_CACHE_TTL=60
-
-# Path to database directory and file (default: ./omatasku.db)
-# Ideal for mounting a writeable volume at /data in read-only containers
-DB_DIR="."
-DB_NAME="omatasku.db"
-
-# Native Uvicorn Socket Bindings (Uvicorn native environment configs)
-UVICORN_PORT=8080
-UVICORN_HOST=0.0.0.0
-```
-
-### Preferred Installation & Run Commands
-Running OmaTasku natively via Uvicorn is the **strictly preferred and recommended production configuration**. It registers Uvicorn directly as the parent process (PID 1), which handles standard OS termination signals (`SIGTERM`, `SIGINT`) instantly and executes clean, graceful shut-downs of connection pools and Lifespan managers.
-
-```bash
-# 1. Initialize virtual environment
-python3 -m venv .venv_sys
-source .venv_sys/bin/activate
-
-# 2. Install dependencies (FastAPI, Uvicorn, httpx, pytest)
-pip install -r requirements.txt
-
-# 3. Start development/production server natively with Uvicorn (RECOMMENDED)
-UVICORN_PORT=8080 UVICORN_HOST=0.0.0.0 uvicorn main:app
-```
-
-#### Programmatic Fallback Option (Local CLI)
-If you prefer running programmatically with traditional command-line arguments:
-```bash
-python3 main.py --host 0.0.0.0 --port 8080 --base-url "http://omatasku.example.com/"
-```
+Refer to the main [README.md](./README.md) for full developer compilation instructions, docker execution environments, and native Uvicorn commands.
 
 ---
 
@@ -184,4 +151,7 @@ python3 main.py --host 0.0.0.0 --port 8080 --base-url "http://omatasku.example.c
 - **Graceful Error Handling & Defensive Programming:**
   - Skip empty, blank, or invalid URLs in resolution and size mapping immediately.
   - If a user's `__tac` cookie is expired or invalid, log a warning and fall back to returning the public preview feed instead of crashing.
+- **Pylint Compliance:**
+  - Ensure all python modules (`main.py`, `database.py`, `tracing.py`, `test_main.py`, `conftest.py`) achieve a perfect **10.00/10** compliance score under Pylint checks.
+  - Strictly adhere to PEP 8 alphabetical import ordering, local state encapsulation, and native exception chaining (`raise ... from exc`).
 - **Testing:** Include testing scripts using `pytest` and `httpx.AsyncClient`'s transport mocks to verify parsing, proxy rewriting, and database mapping state.
