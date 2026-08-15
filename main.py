@@ -654,9 +654,13 @@ def serve_user_script():
         raise HTTPException(status_code=500, detail=f"Failed to serve templated userscript: {str(e)}") from e
 
 # HTML UI route
-@app.get("/", response_class=HTMLResponse)
-def serve_home_page():
-    """Serves the single-page HTML client interface."""
+@app.api_route("/", methods=["GET", "HEAD"])
+def serve_home_page(request: Request):
+    """Serves the single-page HTML client interface for GET, and simple status headers for HEAD."""
+    if request.method == "HEAD":
+        # HEAD requests must not contain a message body! They return only status code and headers.
+        return Response(content=None, status_code=200, media_type="text/html")
+
     static_file_path = os.path.join(os.path.dirname(__file__), "static", "index.html")
     if os.path.exists(static_file_path):
         return FileResponse(static_file_path)

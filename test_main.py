@@ -300,6 +300,12 @@ def test_favicon_ico():
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("image/svg+xml")
 
+def test_root_head_method():
+    # HEAD request on the root "/" route used for uptime monitoring
+    response = client.head("/")
+    assert response.status_code == 200
+    assert response.text == ""  # HEAD response must be empty
+
 def test_security_sanitization():
     # Reset global rate limiter before testing to prevent test-state interference
     main.registration_limiter["registration_count"] = 0
