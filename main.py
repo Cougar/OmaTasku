@@ -393,7 +393,7 @@ def serve_prometheus_metrics():
     metrics_text = "\n".join(lines) + "\n"
     return HTMLResponse(content=metrics_text, media_type="text/plain")
 
-async def fetch_rss_feed_cached(show_slug: str) -> str:
+async def fetch_rss_feed_cached(show_slug: str) -> tuple[str, str]:
     """Fetches the target RSS feed asynchronously and caches it in memory."""
     now = time.time()
 
@@ -401,7 +401,7 @@ async def fetch_rss_feed_cached(show_slug: str) -> str:
     if show_slug in rss_cache:
         entry = rss_cache[show_slug]
         if now < entry["expiry"]:
-            return entry["content"]
+            return entry["content"], entry["content_type"]
 
     # Fetch from target platform (AS Postimees Grupp's AMS)
     target_url = f"https://ams.postimees.ee/rss/shows/{show_slug}"
@@ -426,13 +426,15 @@ async def fetch_rss_feed_cached(show_slug: str) -> str:
                 raise HTTPException(status_code=502, detail=f"Bad Gateway: Request to target platform failed: {str(e)}") from e
 
         feed_content = response.text
+        content_type = response.headers.get("content-type", "application/rss+xml; charset=utf-8")
 
     # Cache the result
     rss_cache[show_slug] = {
         "content": feed_content,
+        "content_type": content_type,
         "expiry": now + RSS_CACHE_TTL
     }
-    return feed_content
+    return feed_content, content_type
 
 # In-memory premium file size cache (never expires)
 # Key: episode_id (str), Value: Content-Length (str)
@@ -604,10 +606,10 @@ async def get_mirrored_rss(user_id: str, show_slug: str):
     if cache_key in user_feed_cache:
         entry = user_feed_cache[cache_key]
         if now < entry["expiry"]:
-            return HTMLResponse(content=entry["content"], media_type="application/rss+xml")
+            return HTMLResponse(content=entry["content"], media_type=entry["content_type"])
 
     # 3. Fetch original RSS feed content (using global cache)
-    feed_xml = await fetch_rss_feed_cached(show_slug)
+    feed_xml, original_content_type = await fetch_rss_feed_cached(show_slug)
 
     # 4. Extract episode IDs and their corresponding original public media URLs
     episode_ids = []
@@ -660,10 +662,11 @@ async def get_mirrored_rss(user_id: str, show_slug: str):
     # 7. Store in user-feed cache
     user_feed_cache[cache_key] = {
         "content": rewritten_xml,
+        "content_type": original_content_type,
         "expiry": now + RSS_CACHE_TTL
     }
 
-    return HTMLResponse(content=rewritten_xml, media_type="application/rss+xml")
+    return HTMLResponse(content=rewritten_xml, media_type=original_content_type)
 
 # Userscript Serving Route with Custom Headers for Auto-Installation
 @app.get("/static/omatasku.user.js")
