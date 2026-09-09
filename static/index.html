@@ -425,7 +425,8 @@
 
             <div class="form-group">
                 <label for="user-cookie">Kopeeritud <b>__tac</b> küpsis (Piano ID)</label>
-                <input type="text" id="user-cookie" class="form-control code" placeholder="Kopeeri siia __tac küpsise sisu..." required>
+                <input type="text" id="user-cookie" class="form-control code" placeholder="Kopeeri siia __tac küpsise sisu..." oninput="updateCookieStatus()" required>
+                <div id="cookie-status" style="margin-top: 0.5rem; font-size: 0.825rem; font-weight: 600; display: none; padding: 0.4rem 0.75rem; border-radius: 4px;"></div>
             </div>
 
             <!-- Timestamps Info (Only shown for loaded edit sessions) -->
@@ -552,6 +553,79 @@
         return String(detail);
     }
 
+    // Decodes the payload segment of a JWT token natively in vanilla JS
+    function parseJwt(token) {
+        try {
+            const segments = token.split('.');
+            if (segments.length !== 3) return null;
+            const base64Url = segments[1];
+            const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+            const jsonPayload = decodeURIComponent(window.atob(base64).split('').map(function(c) {
+                return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+            }).join(''));
+            return JSON.parse(jsonPayload);
+        } catch (e) {
+            return null;
+        }
+    }
+
+    // Calculates and displays the remaining lifespan or expiration status of the cookie
+    function updateCookieStatus() {
+        const cookieInput = document.getElementById('user-cookie').value.trim();
+        const statusDiv = document.getElementById('cookie-status');
+        
+        if (!cookieInput) {
+            statusDiv.style.display = 'none';
+            return;
+        }
+        
+        // Handle mock test tokens gracefully
+        const segments = cookieInput.split('.');
+        if (segments.length !== 3) {
+            statusDiv.style.display = 'block';
+            statusDiv.style.backgroundColor = 'rgba(239, 68, 68, 0.15)';
+            statusDiv.style.color = 'var(--error)';
+            statusDiv.style.border = '1px solid rgba(239, 68, 68, 0.3)';
+            statusDiv.innerHTML = '⚠️ Vigane küpsise vorming (peab olema 3-osaline JWT token).';
+            return;
+        }
+        
+        const payload = parseJwt(cookieInput);
+        if (!payload || !payload.exp) {
+            statusDiv.style.display = 'block';
+            statusDiv.style.backgroundColor = 'rgba(239, 68, 68, 0.15)';
+            statusDiv.style.color = 'var(--error)';
+            statusDiv.style.border = '1px solid rgba(239, 68, 68, 0.3)';
+            statusDiv.innerHTML = '⚠️ Test-seansi või tundmatu vorminguga küpsis (aegumistähtaeg puudub).';
+            return;
+        }
+        
+        const expTime = payload.exp * 1000;
+        const now = Date.now();
+        const diff = expTime - now;
+        
+        statusDiv.style.display = 'block';
+        if (diff <= 0) {
+            statusDiv.style.backgroundColor = 'rgba(239, 68, 68, 0.15)';
+            statusDiv.style.color = 'var(--error)';
+            statusDiv.style.border = '1px solid rgba(239, 68, 68, 0.3)';
+            statusDiv.innerHTML = '🔴 Sinu seansiküpsis on aegunud!';
+        } else {
+            const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+            const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+            let timeStr = "";
+            if (days > 0) {
+                timeStr = `${days} päeva ja ${hours} tundi`;
+            } else {
+                timeStr = `${hours} tundi`;
+            }
+            statusDiv.style.backgroundColor = 'rgba(16, 185, 129, 0.15)';
+            statusDiv.style.color = 'var(--success)';
+            statusDiv.style.border = '1px solid rgba(16, 185, 129, 0.3)';
+            statusDiv.innerHTML = `🟢 Seansiküpsis kehtib veel: <b>${timeStr}</b>`;
+        }
+    }
+
     // Fetch initial configuration on load
     async function loadConfig() {
         try {
@@ -605,7 +679,8 @@
         document.getElementById('user-cookie').value = '';
         document.getElementById('search-uuid').value = '';
         
-        // Hide metadata, feeds, and active notifications
+        // Hide metadata, feeds, active notifications, and cookie status
+        document.getElementById('cookie-status').style.display = 'none';
         document.getElementById('toast-notif').style.display = 'none';
         document.getElementById('meta-container').style.display = 'none';
         document.getElementById('feeds-panel').style.display = 'none';
@@ -639,6 +714,7 @@
                 
                 // Show podcast feeds
                 updateFeedsPanel(uuidVal);
+                updateCookieStatus();
 
                 // If new creation, switch to edit mode immediately
                 if (!isEditMode) {
@@ -683,6 +759,7 @@
                 document.getElementById('user-uuid').readOnly = true;
                 document.getElementById('user-comment').value = data.comment || '';
                 document.getElementById('user-cookie').value = data.tac_cookie;
+                updateCookieStatus();
 
                 // Adjust UI
                 document.getElementById('card-badge').className = "badge edit";
