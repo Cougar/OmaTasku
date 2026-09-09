@@ -378,3 +378,38 @@ def test_security_sanitization():
     invalid_slug_res = client.get(f"/{good_user_id}/postimees/rss/shows/digitund<script>")
     assert invalid_slug_res.status_code == 400
     assert "Lubatud on ainult tähed, numbrid, kriipsud ja alakriipsud" in invalid_slug_res.json()["detail"]
+
+def test_session_revocation_403():
+    # Reset global rate limiter before testing to prevent test-state interference
+    main.registration_limiter["registration_count"] = 0
+    main.registration_limiter["window_start"] = main.time.time()
+
+    # Verify that if the cookie has been revoked/is invalid (meaning Kuku API returns preview URLs),
+    # the server raises an explicit 403 Forbidden with a clear explanation for AntennaPod users!
+    user_id = str(uuid.uuid4())
+    client.post("/api/users", json={
+        "uuid": user_id,
+        "tac_cookie": "header.payload.signature",
+        "comment": "Revoked Cookie Tester"
+    })
+    
+    with patch("main.httpx.AsyncClient") as mock_client_class:
+        mock_client = mock_client_class.return_value
+        mock_client.__aenter__.return_value = mock_client
+        
+        async def mock_get(url, *_args, **_kwargs):
+            response = AsyncMock()
+            response.status_code = 200
+            response.raise_for_status = lambda: None
+            if "ams.postimees.ee" in url:
+                response.text = '<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"><channel><title>Digitund</title><item><title>Digitund Episode</title><enclosure url="https://router.euddn.net/abc/preview/full/show-episodes/309848.mp3?c=8000&amp;ddnt=preview_sig" length="2970732" type="audio/mpeg"></enclosure></item></channel></rss>'
+            elif "kuku.postimees.ee" in url:
+                # Mock unauthenticated/revoked response returning preview URL!
+                response.json = lambda: {"309848": "https://router.euddn.net/abc/preview/full/show-episodes/309848.mp3?c=8000&ddnt=preview_sig"}
+            return response
+            
+        mock_client.get = mock_get
+        
+        response = client.get(f"/{user_id}/postimees/rss/shows/digitund")
+        assert response.status_code == 403
+        assert "Sinu seansiküpsis on platvormi poolt tagasi lükatud" in response.json()["detail"]

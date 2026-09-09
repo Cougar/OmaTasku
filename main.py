@@ -10,7 +10,9 @@ Content-Length validations, Violentmonkey template distributions, and Prometheus
 
 import argparse
 import asyncio
+import base64
 from contextlib import asynccontextmanager
+import json
 import mimetypes
 import os
 import re
@@ -188,6 +190,24 @@ def clean_and_validate_comment(v: Optional[str]) -> Optional[str]:
     if not all(c.isalnum() or c in allowed_punctuation for c in v_clean):
         raise ValueError("sisaldab keelatud erisümboleid. Lubatud on ainult tähed, numbrid, tühikud, punktid, komad, kriipsud ja alakriipsud.")
     return v_clean
+
+def is_jwt_cookie_expired(tac_cookie: str) -> bool:
+    """Decodes the __tac JWT token natively to verify if its 'exp' claim is in the past."""
+    try:
+        segments = tac_cookie.split(".")
+        if len(segments) != 3:
+            return False  # Treat non-JWT or malformed test strings as not expired
+        payload_b64 = segments[1]
+        # Normalize base64 padding
+        payload_b64 += "=" * ((4 - len(payload_b64) % 4) % 4)
+        payload_bytes = base64.urlsafe_b64decode(payload_b64)
+        payload = json.loads(payload_bytes)
+        exp = payload.get("exp")
+        if exp:
+            return time.time() > float(exp)
+    except Exception:
+        return False  # Return False under parsing exceptions to allow standard mock test strings
+    return False
 
 # Pydantic Schemas for API with Strict Input Sanitization
 class UserCreate(BaseModel):
@@ -571,6 +591,14 @@ async def get_mirrored_rss(user_id: str, show_slug: str):
     if not user:
         raise HTTPException(status_code=404, detail="Kasutaja ID-d ei leitud või ei ole registreeritud.")
 
+    # Offline validation check:
+    # If the user's saved __tac JWT token is natively expired, fail immediately with 403!
+    if is_jwt_cookie_expired(user["tac_cookie"]):
+        raise HTTPException(
+            status_code=403,
+            detail="OmaTasku: Sinu seansiküpsis (__tac) on aegunud. Palun logi uuesti raadioportaali sisse ja sünkroniseeri värske seansiküpsis."
+        )
+
     # 2. Check user-feed cache
     cache_key = (user_id, show_slug)
     if cache_key in user_feed_cache:
@@ -601,6 +629,17 @@ async def get_mirrored_rss(user_id: str, show_slug: str):
     premium_url_map = {}
     if episode_ids:
         premium_url_map = await resolve_premium_urls(episode_ids[:50], user["tac_cookie"])
+
+        # Online validation check:
+        # If Kuku API returned successful mappings, but ALL of them contain '/preview/' instead of '/full/',
+        # it means the session cookie has been revoked, is invalid, or has no active premium subscription!
+        if premium_url_map:
+            valid_urls = [url for url in premium_url_map.values() if url]
+            if valid_urls and all("/preview/" in url for url in valid_urls):
+                raise HTTPException(
+                    status_code=403,
+                    detail="OmaTasku: Sinu seansiküpsis on platvormi poolt tagasi lükatud (tellimus on lõppenud või välja logitud). Palun sünkroniseeri värske seansiküpsis!"
+                )
 
     # 5b. Fetch premium file sizes concurrently in parallel (leveraging asyncio.gather)
     premium_size_map = {}
