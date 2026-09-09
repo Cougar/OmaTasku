@@ -1,5 +1,5 @@
 # Use an official lightweight Python stable runtime as a parent image
-FROM python:3.11-slim
+FROM python:3.12-alpine
 
 # Prevent Python from writing .pyc files to disc and enable unbuffered logging
 ENV PYTHONDONTWRITEBYTECODE=1
