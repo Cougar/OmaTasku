@@ -111,6 +111,7 @@ def test_rss_proxy_cached(mock_client_class):
         response = AsyncMock()
         response.status_code = 200
         response.raise_for_status = lambda: None
+        response.headers = {"content-type": "application/rss+xml; charset=UTF-8"}
         
         if "ams.postimees.ee" in url:
             response.text = '<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"><channel><title>Digitund</title><item><title>Digitund Episode</title><enclosure url="https://router.euddn.net/abc/preview/full/show-episodes/309848.mp3?c=8000&amp;ddnt=preview_sig" length="2970732" type="audio/mpeg"></enclosure></item></channel></rss>'
@@ -224,6 +225,7 @@ def test_prometheus_metrics():
             response = AsyncMock()
             response.status_code = 200
             response.raise_for_status = lambda: None
+            response.headers = {"content-type": "application/rss+xml; charset=UTF-8"}
             if "ams.postimees.ee" in url:
                 response.text = '<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"><channel><title>Digitund</title><item><title>Digitund Episode</title><enclosure url="https://router.euddn.net/abc/preview/full/show-episodes/400100.mp3?c=8000&amp;ddnt=preview_sig" length="2970732" type="audio/mpeg"></enclosure></item></channel></rss>'
             elif "kuku.postimees.ee" in url:
@@ -401,6 +403,7 @@ def test_session_revocation_403():
             response = AsyncMock()
             response.status_code = 200
             response.raise_for_status = lambda: None
+            response.headers = {"content-type": "application/rss+xml; charset=UTF-8"}
             if "ams.postimees.ee" in url:
                 response.text = '<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"><channel><title>Digitund</title><item><title>Digitund Episode</title><enclosure url="https://router.euddn.net/abc/preview/full/show-episodes/309848.mp3?c=8000&amp;ddnt=preview_sig" length="2970732" type="audio/mpeg"></enclosure></item></channel></rss>'
             elif "kuku.postimees.ee" in url:
