@@ -27,7 +27,7 @@ Authorization is completed using a valid subscriber session token cookie. To pre
 
 #### C. Audio URL Resolution API
 - To play/download an episode, OmaTasku queries the platform backend resolver:
-  `GET https://kuula.postimees.ee/api/proxy/ams/kuula/episodes/urls?ids={episode_id}`
+  `GET https://kuku.postimees.ee/api/proxy/ams/kuula/episodes/urls?ids={episode_id}`
 - **Response if Unauthenticated / Public:** Returns a CDN URL containing the `/preview/` path segment and a signature valid only for the ~74s snippet.
 - **Response if Subscribed:** (Forwarding the active `__tac` cookie) Returns a CDN URL containing the `/full/` segment and a premium cryptographic signature valid for the entire episode:
   `https://router.example.net/[hash]/full/full/show-episodes/[id].mp3?c=8000&ddnt=[premium_signature]`
@@ -103,18 +103,20 @@ When a podcast player hits this route:
 1. **Validation:**
    - Verify `user_id` matches UUIDv4 format, returning `400` if invalid.
    - Verify `show_slug` matches `^[a-zA-Z0-9_\-]+$`, returning `400` if invalid (prevents path traversal/SSRF).
-2. **User Lookup:**
+2. **User Lookup & Active Session Validation (Offline):**
    - Query `users` by `user_id`. If not found, fall back gracefully to returning the public original RSS XML.
+   - **Offline JWT Expiry Check:** Decode the `__tac` JWT token natively to extract its `exp` (expiration) epoch claim. If the `exp` claim is in the past, immediately raise a `403 Forbidden` exception so that podcast players (like AntennaPod) can report the authentication error.
 3. **Feed Caching (Layer 1 & 2):**
-   - Check per-user feed XML cache for key `(user_id, show_slug)`. If hit and unexpired, return XML instantly.
+   - Check per-user feed XML cache for key `(user_id, show_slug)`. If hit and unexpired, return XML instantly with its cached Content-Type.
    - Check global original RSS feed XML cache for key `show_slug`. If missed, fetch from `https://ams.postimees.ee/rss/shows/{show_slug}` and write to original XML cache (TTL: 60s).
 4. **Episode Extraction:**
    - Parse XML and extract `<enclosure>` tags.
    - Gather all unique numerical episode IDs using regex `(\d+)\.mp3` on the enclosure URL.
    - Keep a map of `{episode_id: original_url}`.
-5. **Batch Premium URL Resolution:**
-   - Send `GET https://kuula.postimees.ee/api/proxy/ams/kuula/episodes/urls?ids={comma_separated_ids}` with header `Cookie: __tac={user.tac_cookie}`.
+5. **Batch Premium URL Resolution & Active Session Validation (Online):**
+   - Send `GET https://kuku.postimees.ee/api/proxy/ams/kuula/episodes/urls?ids={comma_separated_ids}` with header `Cookie: __tac={user.tac_cookie}` (explicitly following HTTP redirects).
    - Returns a JSON dictionary mapping `{episode_id: premium_url}`.
+   - **Online Revocation Check:** If the resolver API returned successful responses, but **ALL** returned URLs contain the `/preview/` segment instead of `/full/`, it means the session has been revoked, is invalid, or has no active premium subscription. In this case, raise a `403 Forbidden` exception directly.
 6. **Concurrent File Size Resolution (Layer 3 & 4):**
    - For each valid `premium_url`:
      - Strip query parameters from `original_url` to get a clean key: `clean_public_url = original_url.split("?")[0]`.
@@ -123,7 +125,7 @@ When a podcast player hits this route:
      - On cache miss, execute an asynchronous concurrent HTTP `HEAD` request to `premium_url` (following redirects). Extract the `Content-Length` header, populate the memory cache, and insert/replace permanently into the `file_sizes` table using `clean_public_url`.
 7. **XML Rewriting & Response:**
    - Re-serialize the XML, swapping the preview `<enclosure url="...">` and `<enclosure length="...">` attributes with their premium equivalents.
-   - Cache the final premium XML globally for 60 seconds and return with `application/rss+xml; charset=utf-8` content-type.
+   - Cache the final premium XML globally for 60 seconds and return with the **exact, preserved Content-Type and Charset encoding of the original feed** (such as `application/rss+xml; charset=UTF-8`), preserving character rendering integrity.
 
 ### C. Web Dashboard UI & Cookie Synchronization APIs
 - **`GET /`**: Serves a static HTML client (must accept both `GET` and `HEAD` requests for uptime monitoring).
