@@ -114,7 +114,7 @@ def test_rss_proxy_cached(mock_client_class):
         
         if "ams.postimees.ee" in url:
             response.text = '<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"><channel><title>Digitund</title><item><title>Digitund Episode</title><enclosure url="https://router.euddn.net/abc/preview/full/show-episodes/309848.mp3?c=8000&amp;ddnt=preview_sig" length="2970732" type="audio/mpeg"></enclosure></item></channel></rss>'
-        elif "kuula.postimees.ee" in url:
+        elif "kuku.postimees.ee" in url:
             # Verify the correct tac cookie is forwarded in headers!
             assert "Cookie" in kwargs.get("headers", {})
             assert "__tac=test.tac.token" in kwargs["headers"]["Cookie"]
@@ -164,7 +164,7 @@ def test_rss_proxy_cached(mock_client_class):
     assert len(get_calls) == 2
     assert len(head_calls) == 1
     assert any("ams.postimees.ee" in u for u in get_calls)
-    assert any("kuula.postimees.ee" in u for u in get_calls)
+    assert any("kuku.postimees.ee" in u for u in get_calls)
     assert any("abc/full/full" in u for u in head_calls)
     
     # Verify that the resolved size is successfully cached in the SQLite database permanently using the clean .mp3 path as the key!
@@ -226,7 +226,7 @@ def test_prometheus_metrics():
             response.raise_for_status = lambda: None
             if "ams.postimees.ee" in url:
                 response.text = '<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"><channel><title>Digitund</title><item><title>Digitund Episode</title><enclosure url="https://router.euddn.net/abc/preview/full/show-episodes/400100.mp3?c=8000&amp;ddnt=preview_sig" length="2970732" type="audio/mpeg"></enclosure></item></channel></rss>'
-            elif "kuula.postimees.ee" in url:
+            elif "kuku.postimees.ee" in url:
                 response.json = lambda: {"400100": "https://router.euddn.net/abc/full/full/show-episodes/400100.mp3?c=8000&ddnt=premium_sig"}
             return response
             

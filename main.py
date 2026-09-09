@@ -491,7 +491,8 @@ async def resolve_premium_urls(episode_ids: list[str], tac_cookie: str) -> dict[
         return {}
 
     ids_param = ",".join(episode_ids)
-    target_url = f"https://kuula.postimees.ee/api/proxy/ams/kuula/episodes/urls?ids={ids_param}"
+    # Target kuku.postimees.ee directly as the platform provider has migrated from kuula.postimees.ee
+    target_url = f"https://kuku.postimees.ee/api/proxy/ams/kuula/episodes/urls?ids={ids_param}"
 
     headers = {
         "Cookie": f"__tac={tac_cookie}",
@@ -509,7 +510,7 @@ async def resolve_premium_urls(episode_ids: list[str], tac_cookie: str) -> dict[
 
         async with httpx.AsyncClient(timeout=10.0) as client:
             try:
-                response = await client.get(target_url, headers=headers)
+                response = await client.get(target_url, headers=headers, follow_redirects=True)
                 response.raise_for_status()
                 span.set_attribute("http.status_code", response.status_code)
                 return response.json()
