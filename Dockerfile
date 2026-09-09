@@ -1,5 +1,5 @@
 # Use an official lightweight Python stable runtime as a parent image
-FROM python:3.12-alpine
+FROM python:3.14-alpine
 
 # Prevent Python from writing .pyc files to disc and enable unbuffered logging
 ENV PYTHONDONTWRITEBYTECODE=1
@@ -12,7 +12,10 @@ WORKDIR /app
 COPY requirements.txt .
 
 # Install dependencies (system-wide inside the container is standard/safe)
-RUN pip install --no-cache-dir -r requirements.txt
+RUN apk --no-cache upgrade libuuid \
+ && pip install --upgrade pip \
+ && pip install --no-cache-dir -r requirements.txt --root-user-action ignore \
+ && pip freeze
 
 # Copy the application source code and static assets into the container
 COPY database.py main.py tracing.py ./
