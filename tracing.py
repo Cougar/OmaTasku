@@ -146,7 +146,8 @@ def instrument_fastapi_app(app):
     if HAS_OTEL and os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT"):
         # pylint: disable=broad-except
         try:
-            FastAPIInstrumentor.instrument_app(app)
+            # Exclude the metrics endpoint from tracing to avoid cluttering Tempo database
+            FastAPIInstrumentor.instrument_app(app, excluded_urls=".*/metrics")
             print("OmaTasku Trace Info: FastAPI app successfully instrumented with OpenTelemetry.")
         except Exception as e:
             print(f"OmaTasku Warning: Could not instrument FastAPI app: {e}")

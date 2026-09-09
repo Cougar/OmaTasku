@@ -416,3 +416,28 @@ def test_session_revocation_403():
         response = client.get(f"/{user_id}/postimees/rss/shows/digitund")
         assert response.status_code == 403
         assert "Sinu seansiküpsis on platvormi poolt tagasi lükatud" in response.json()["detail"]
+
+
+def test_tracing_instrumentation_excludes_metrics():
+    # pylint: disable=import-outside-toplevel
+    from unittest.mock import MagicMock
+    import tracing
+
+    with patch("tracing.HAS_OTEL", True), \
+         patch("tracing.os.getenv") as mock_getenv, \
+         patch("tracing.FastAPIInstrumentor") as mock_instrumentor:
+
+        # Configure os.getenv to simulate OTEL_EXPORTER_OTLP_ENDPOINT being set
+        def side_effect(key, default=None):
+            if key == "OTEL_EXPORTER_OTLP_ENDPOINT":
+                return "http://localhost:4318/v1/traces"
+            return os.environ.get(key, default)
+
+        mock_getenv.side_effect = side_effect
+
+        # Call the instrumenter function
+        mock_app = MagicMock()
+        tracing.instrument_fastapi_app(mock_app)
+
+        # Verify FastAPIInstrumentor().instrument_app was called with excluded_urls
+        mock_instrumentor.instrument_app.assert_called_once_with(mock_app, excluded_urls=".*/metrics")
