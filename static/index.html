@@ -637,7 +637,7 @@
         } catch (e) {
             console.error("Config fetching failed, using origin:", e);
         }
-        await resetForm();
+        await resetForm(false); // Do not clear URL on initial load to preserve bookmark checks
     }
 
     // Displays an overlay notification toast
@@ -663,7 +663,7 @@
     }
 
     // Reset back to "Create New" state
-    async function resetForm() {
+    async function resetForm(clearUrl = true) {
         isEditMode = false;
         
         // Reset UI labels
@@ -684,6 +684,11 @@
         document.getElementById('toast-notif').style.display = 'none';
         document.getElementById('meta-container').style.display = 'none';
         document.getElementById('feeds-panel').style.display = 'none';
+
+        // Clear query parameter from URL bar if requested
+        if (clearUrl) {
+            window.history.replaceState(null, '', window.location.pathname);
+        }
     }
 
     // Submits either a POST or PUT request depending on edit state
@@ -716,6 +721,9 @@
                 updateFeedsPanel(uuidVal);
                 updateCookieStatus();
 
+                // Update URL for bookmarking
+                window.history.replaceState(null, '', `?uuid=${uuidVal}`);
+
                 // If new creation, switch to edit mode immediately
                 if (!isEditMode) {
                     isEditMode = true;
@@ -739,8 +747,8 @@
     }
 
     // Searches for an existing user UUID
-    async function searchUser() {
-        const uuidVal = document.getElementById('search-uuid').value.trim();
+    async function searchUser(uuidFromQuery = null) {
+        const uuidVal = uuidFromQuery ? uuidFromQuery.trim() : document.getElementById('search-uuid').value.trim();
         if (!uuidVal) {
             showToast("Sisesta otsinguks olemasolev kasutaja ID (UUID)!", "error");
             return;
@@ -774,6 +782,9 @@
 
                 // Display custom feeds URLs
                 updateFeedsPanel(data.uuid);
+
+                // Update URL for bookmarking
+                window.history.replaceState(null, '', `?uuid=${data.uuid}`);
 
             } else {
                 showToast(extractErrorMessage(data), "error");
@@ -818,7 +829,15 @@
     }
 
     // Run on startup
-    window.onload = loadConfig;
+    window.onload = async () => {
+        await loadConfig();
+        const urlParams = new URLSearchParams(window.location.search);
+        const uuidParam = urlParams.get('uuid');
+        if (uuidParam) {
+            document.getElementById('search-uuid').value = uuidParam;
+            await searchUser(uuidParam);
+        }
+    };
 </script>
 
 </body>
