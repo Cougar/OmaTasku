@@ -395,10 +395,10 @@
 
     <!-- Search/Load Card -->
     <div class="search-card">
-        <div class="search-group">
-            <input type="text" id="search-uuid" class="search-input" placeholder="Sisesta olemasolev kasutaja ID (UUIDv4) laadimiseks...">
-            <button class="btn btn-secondary" onclick="searchUser()">Laadi</button>
-        </div>
+        <form id="search-form" class="search-group" onsubmit="event.preventDefault(); searchUser();">
+            <input type="text" id="search-uuid" name="uuid" list="uuid-history" autocomplete="username" class="search-input" placeholder="Sisesta olemasolev kasutaja ID (UUIDv4) laadimiseks...">
+            <button type="submit" class="btn btn-secondary">Laadi</button>
+        </form>
     </div>
 
     <!-- Notification Feed -->
@@ -412,7 +412,7 @@
         <form id="session-form" onsubmit="submitForm(event)">
             <div class="form-group">
                 <label for="user-uuid">Sinu kordumatu kasutaja ID (UUID)</label>
-                <input type="text" id="user-uuid" class="form-control code" placeholder="Sisesta või kopeeri UUIDv4..." required>
+                <input type="text" id="user-uuid" name="uuid" list="uuid-history" autocomplete="username" class="form-control code" placeholder="Sisesta või kopeeri UUIDv4..." required>
                 <p style="color: var(--text-muted); font-size: 0.75rem; margin-top: 0.35rem;">
                     * See väli on täidetud automaatselt, kuid võid siia kleepida oma <b>vana/olemasoleva UUIDv4</b> (nt. andmebaasi taastamisel), et vältida podcastide linkide muutmist.
                 </p>
@@ -515,9 +515,60 @@
     </div>
 </div>
 
+<datalist id="uuid-history"></datalist>
+
 <script>
     let isEditMode = false;
     let serverBaseUrl = window.location.origin;
+
+    // Helper to get UUID history from localStorage
+    function getUUIDHistory() {
+        try {
+            const history = localStorage.getItem('omatasku_uuid_history');
+            return history ? JSON.parse(history) : [];
+        } catch (e) {
+            console.error("Failed to read UUID history:", e);
+            return [];
+        }
+    }
+
+    // Helper to save a valid UUID to localStorage history
+    function saveUUIDToHistory(uuid) {
+        if (!uuid) return;
+        const cleaned = uuid.trim();
+        // Basic UUIDv4 regex to validate format before saving
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        if (!uuidRegex.test(cleaned)) return;
+
+        let history = getUUIDHistory();
+        // Remove existing to place on top (most recent)
+        history = history.filter(item => item.toLowerCase() !== cleaned.toLowerCase());
+        history.unshift(cleaned);
+        // Limit to top 20 items to avoid bloat
+        if (history.length > 20) {
+            history = history.slice(0, 20);
+        }
+
+        try {
+            localStorage.setItem('omatasku_uuid_history', JSON.stringify(history));
+        } catch (e) {
+            console.error("Failed to save UUID to history:", e);
+        }
+    }
+
+    // Helper to populate/update the datalist elements from localStorage
+    function updateUUIDDatalist() {
+        const datalist = document.getElementById('uuid-history');
+        if (!datalist) return;
+
+        const history = getUUIDHistory();
+        datalist.innerHTML = '';
+        history.forEach(uuid => {
+            const option = document.createElement('option');
+            option.value = uuid;
+            datalist.appendChild(option);
+        });
+    }
 
     // Dynamically parses and extracts user-friendly error messages from API responses
     function extractErrorMessage(data) {
@@ -714,6 +765,10 @@
             if (res.ok) {
                 showToast(isEditMode ? "Kasutaja seanss uuendatud edukalt!" : "Uus kasutaja registreeritud edukalt!", "success");
                 
+                // Save UUID to history list
+                saveUUIDToHistory(uuidVal);
+                updateUUIDDatalist();
+                
                 // Set UUID field to readonly after successful save
                 document.getElementById('user-uuid').readOnly = true;
                 
@@ -761,6 +816,10 @@
             if (res.ok) {
                 showToast("Kasutaja andmed laetud!", "success");
                 isEditMode = true;
+
+                // Save UUID to history list
+                saveUUIDToHistory(data.uuid);
+                updateUUIDDatalist();
 
                 // Populate form
                 document.getElementById('user-uuid').value = data.uuid;
@@ -830,6 +889,7 @@
 
     // Run on startup
     window.onload = async () => {
+        updateUUIDDatalist(); // Populate autocompletion list on startup
         await loadConfig();
         const urlParams = new URLSearchParams(window.location.search);
         const uuidParam = urlParams.get('uuid');
