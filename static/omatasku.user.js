@@ -1,9 +1,10 @@
 // ==UserScript==
 // @name         OmaTasku Partner
 // @namespace    OmaTasku
-// @version      1.1
-// @description  Sünkroniseerib ühe klikiga kuula.postimees.ee premium-küpsise ja tekitab podcastide lehtedele premium RSS-voo nupud!
+// @version      1.2
+// @description  Sünkroniseerib ühe klikiga kuku.postimees.ee premium-küpsise ja tekitab podcastide lehtedele premium RSS-voo nupud!
 // @author       OmaTasku
+// @match        https://kuku.postimees.ee/*
 // @match        https://kuula.postimees.ee/*
 // @grant        GM_setValue
 // @grant        GM_getValue
@@ -193,7 +194,12 @@
     function extractShowSlug(path) {
         const segments = path.split('/').filter(Boolean);
         if (segments.length >= 2) {
-            if (segments[0] === 'kuku') {
+            if (segments[0] === 'podcast') {
+                const blacklisted = ['saatekava', 'uudised', 'otsing'];
+                if (!blacklisted.includes(segments[1])) {
+                    return segments[1];
+                }
+            } else if (segments[0] === 'kuku') {
                 const blacklisted = ['saatekava', 'uudised', 'otsing', 'podcastid'];
                 if (!blacklisted.includes(segments[1])) {
                     return segments[1];

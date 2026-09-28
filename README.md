@@ -125,7 +125,7 @@ OmaTasku sisaldab mugavat ja turvalist kaasasolevat Violentmonkey/Tampermonkey a
 
 1. Ava oma kohalik veebiliides **`http://localhost:8080`**.
 2. Klõpsa nupule **📥 Paigalda OmaTasku Partner Skript**, et paigaldada kasutajaskript oma brauserisse.
-3. Ava mistahes saate leht portaalis [Kuku Raadio (kuula.postimees.ee)](https://kuula.postimees.ee/).
+3. Ava mistahes saate leht portaalis [Kuku Raadio (kuku.postimees.ee)](https://kuku.postimees.ee/).
 4. Klõpsa ekraani all paremas nurgas asuvale sinisele nupule **`⚡ OmaTasku Sünk`**. Kasutajaskript loeb automaatselt sinu sisselogitud premium-seansi tokeni ja sünkroonib selle turvaliselt sinu kohaliku OmaTasku serveriga (`http://localhost:8080`) vähem kui sekundiga!
 5. Klõpsates mistahes saate pealkirja kõrvale tekkivat rohelist nuppu **`📻 OmaTasku RSS`**, kopeeritakse selle saate isiklik premium-mängija link otse sinu lõikelauale, valmis sisestamiseks suvalisse mängijasse!
 
