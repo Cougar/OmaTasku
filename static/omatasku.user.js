@@ -194,12 +194,7 @@
     function extractShowSlug(path) {
         const segments = path.split('/').filter(Boolean);
         if (segments.length >= 2) {
-            if (segments[0] === 'podcast') {
-                const blacklisted = ['saatekava', 'uudised', 'otsing'];
-                if (!blacklisted.includes(segments[1])) {
-                    return segments[1];
-                }
-            } else if (segments[0] === 'kuku') {
+            if (segments[0] === 'podcast' || segments[0] === 'kuku') {
                 const blacklisted = ['saatekava', 'uudised', 'otsing', 'podcastid'];
                 if (!blacklisted.includes(segments[1])) {
                     return segments[1];
