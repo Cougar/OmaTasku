@@ -441,3 +441,24 @@ def test_tracing_instrumentation_excludes_metrics():
 
         # Verify FastAPIInstrumentor().instrument_app was called with excluded_urls
         mock_instrumentor.instrument_app.assert_called_once_with(mock_app, excluded_urls=".*/metrics")
+
+
+def test_database_timestamp_and_dir_handling():
+    # Verify empty DB returns 0.0
+    assert database.get_last_registration_timestamp() == 0.0
+
+    # Insert a user with an invalid date string to test graceful exception handling
+    with database.get_connection() as conn:
+        conn.execute(
+            "INSERT INTO users (uuid, tac_cookie, comment, created_at, updated_at) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (str(uuid.uuid4()), "dummy.jwt.token", "corrupted", "invalid-date-format", "invalid-date-format"),
+        )
+        conn.commit()
+
+    assert database.get_last_registration_timestamp() == 0.0
+
+    # Test ensure_db_dir_exists handles OSError gracefully
+    with patch("os.path.exists", return_value=False), \
+         patch("os.makedirs", side_effect=OSError("Disk read-only")):
+        database.ensure_db_dir_exists()

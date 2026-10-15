@@ -27,8 +27,7 @@ def ensure_db_dir_exists():
     if db_dir_parent and not os.path.exists(db_dir_parent):
         try:
             os.makedirs(db_dir_parent, exist_ok=True)
-        # pylint: disable=broad-except
-        except Exception as e:
+        except OSError as e:
             print(f"OmaTasku Warning: Could not create database directory {db_dir_parent}: {e}")
 
 
@@ -191,7 +190,6 @@ def get_last_registration_timestamp() -> float:
             try:
                 dt = datetime.fromisoformat(row[0])
                 return dt.timestamp()
-            # pylint: disable=broad-except
-            except Exception:
+            except (ValueError, TypeError, OSError):
                 pass
     return 0.0
